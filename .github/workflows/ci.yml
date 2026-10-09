@@ -1,0 +1,102 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: ProviderKit tests (iOS Simulator)
+    runs-on: macos-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Choose an iPhone simulator
+        id: sim
+        run: |
+          set -euo pipefail
+          UDID=$(python3 - <<'PY'
+          import json, re, subprocess, sys
+          raw = subprocess.check_output(["xcrun", "simctl", "list", "devices", "available", "-j"])
+          data = json.loads(raw)
+          candidates = []
+          for runtime, devices in data.get("devices", {}).items():
+              if "iOS" not in runtime:
+                  continue
+              match = re.search(r"iOS-(\d+)-(\d+)", runtime)
+              version = (int(match.group(1)), int(match.group(2))) if match else (0, 0)
+              for device in devices:
+                  if not device.get("isAvailable", True):
+                      continue
+                  name = device.get("name", "")
+                  if name.startswith("iPhone"):
+                      candidates.append((version, name, device["udid"]))
+          if not candidates:
+              sys.exit("no iPhone simulator")
+          candidates.sort()
+          print(candidates[-1][2])
+          PY
+          )
+          echo "udid=$UDID" >> "$GITHUB_OUTPUT"
+          echo "simulator $UDID"
+
+      - name: Test ProviderKit
+        working-directory: Packages/ProviderKit
+        run: |
+          set -euo pipefail
+          xcodebuild test \
+            -scheme ProviderKit \
+            -destination "id=${{ steps.sim.outputs.udid }}" \
+            -derivedDataPath "$GITHUB_WORKSPACE/DerivedData/ProviderKit" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY=""
+
+  app:
+    name: Build app (iOS Simulator)
+    runs-on: macos-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Client id template
+        run: cp Config/Secrets.xcconfig.template Config/Secrets.xcconfig
+
+      - name: Fetch pinned fsearch
+        run: bash scripts/fetch-fsearch.sh
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios,aarch64-apple-ios-sim,x86_64-apple-ios,aarch64-apple-darwin,x86_64-apple-darwin
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: ThirdParty/fsearch
+
+      - name: Build FSearchFFI.xcframework
+        run: ./ThirdParty/fsearch/apple/build-xcframework.sh
+
+      - name: XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate the Xcode project
+        run: xcodegen generate
+
+      - name: Build for the iOS Simulator
+        run: |
+          set -euo pipefail
+          test -d ThirdParty/fsearch/apple/FSearchKit/FSearchFFI.xcframework
+          xcodebuild build \
+            -project DriveSearch.xcodeproj \
+            -scheme DriveSearch \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath DerivedData/App \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY=""
