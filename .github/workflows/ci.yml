@@ -82,6 +82,15 @@ jobs:
       - name: Build FSearchFFI.xcframework
         run: ./ThirdParty/fsearch/apple/build-xcframework.sh
 
+      - name: Stage the XCFramework for SwiftPM
+        run: |
+          set -euo pipefail
+          # Path packages inside a git checkout only see tracked files.
+          # The framework is built locally and is not part of the pinned commit.
+          git -C ThirdParty/fsearch add -f -- \
+            apple/FSearchKit/FSearchFFI.xcframework \
+            apple/FSearchKit/Sources/FSearchFFIBindings/FSearchFFI.swift
+
       - name: XcodeGen
         run: brew install xcodegen
 

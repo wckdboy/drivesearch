@@ -86,12 +86,15 @@ You need macOS with Xcode 16 or newer, Rust (the fsearch script calls `rustup`),
 cp Config/Secrets.xcconfig.template Config/Secrets.xcconfig
 bash scripts/fetch-fsearch.sh
 ./ThirdParty/fsearch/apple/build-xcframework.sh
+git -C ThirdParty/fsearch add -f apple/FSearchKit/FSearchFFI.xcframework
 brew install xcodegen
 xcodegen generate
 open DriveSearch.xcodeproj
 ```
 
 `Config/Secrets.xcconfig` is gitignored. Leave a client id empty until you register that provider. No client secret belongs in the file or the repo.
+
+SwiftPM reads the fsearch checkout through git, so the XCFramework has to be in that clone's index. The `git add -f` above does that. It does not commit the binary to DriveSearch.
 
 The checked-in xcconfig disables code signing so CI can build. For a device, set your team and turn signing back on for the DriveSearch target. Bundle id: `dev.wckdboy.drivesearch`.
 

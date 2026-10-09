@@ -7,7 +7,6 @@ let package = Package(
         .iOS(.v17),
         .macOS(.v14),
     ],
-    swiftLanguageVersions: [.v5],
     products: [
         .library(name: "ProviderKit", targets: ["ProviderKit"]),
     ],
