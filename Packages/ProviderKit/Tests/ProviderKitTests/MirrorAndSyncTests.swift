@@ -1,3 +1,4 @@
+import os
 import XCTest
 @testable import ProviderKit
 
@@ -45,7 +46,8 @@ final class MirrorAndSyncTests: XCTestCase {
         try await catalog.deleteStale(account: account.id, keeping: 2)
         let gone = try await catalog.items(account: account.id)
         XCTAssertTrue(gone.isEmpty)
-        let stored = try XCTUnwrap(try await catalog.account(account.id))
+        let storedAccount = try await catalog.account(account.id)
+        let stored = try XCTUnwrap(storedAccount)
         XCTAssertEqual(stored.displayName, "Dropbox")
         XCTAssertEqual(stored.kind, .dropbox)
     }
@@ -85,7 +87,8 @@ final class MirrorAndSyncTests: XCTestCase {
         try handle.close()
         XCTAssertFalse(prefix.contains(where: { $0 != 0 }))
         XCTAssertEqual(refresh.count, 1)
-        let stored = try XCTUnwrap(try await catalog.account(account.id))
+        let storedAccount = try await catalog.account(account.id)
+        let stored = try XCTUnwrap(storedAccount)
         XCTAssertEqual(stored.cursor?.phase, "google.changes")
         XCTAssertEqual(stored.cursor?.token, "99")
         XCTAssertEqual(stored.status, .idle)
@@ -99,35 +102,29 @@ final class ScriptedHTTP: HTTPSending, @unchecked Sendable {
         var result: HTTPResult
     }
 
-    private let lock = NSLock()
-    private var routes: [Route]
+    private let routes: OSAllocatedUnfairLock<[Route]>
 
     init(routes: [Route]) {
-        self.routes = routes
+        self.routes = OSAllocatedUnfairLock(initialState: routes)
     }
 
     func send(_ request: URLRequest) async throws -> HTTPResult {
-        lock.lock()
-        defer { lock.unlock() }
-        guard let index = routes.firstIndex(where: { $0.match(request) }) else {
+        let result = routes.withLock { routes -> HTTPResult? in
+            guard let index = routes.firstIndex(where: { $0.match(request) }) else { return nil }
+            return routes.remove(at: index).result
+        }
+        guard let result else {
             throw ProviderError.transport("unexpected \(request.url?.absoluteString ?? "")")
         }
-        return routes.remove(at: index).result
+        return result
     }
 }
 
 final class RecordingRefresh: SearchRefreshing, @unchecked Sendable {
-    private let lock = NSLock()
-    private var value = 0
-    var count: Int {
-        lock.lock()
-        defer { lock.unlock() }
-        return value
-    }
+    private let value = OSAllocatedUnfairLock(initialState: 0)
+    var count: Int { value.withLock { $0 } }
 
     func refresh() async throws {
-        lock.lock()
-        value += 1
-        lock.unlock()
+        value.withLock { $0 += 1 }
     }
 }

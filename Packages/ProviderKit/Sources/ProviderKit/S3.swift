@@ -70,12 +70,20 @@ enum SigV4 {
     }
 
     static func canonicalQuery(_ items: [URLQueryItem]) -> String {
-        items.map { item in
-            (uriEncode(item.name, encodeSlash: true), uriEncode(item.value ?? "", encodeSlash: true))
+        var pairs: [(name: String, value: String)] = []
+        pairs.reserveCapacity(items.count)
+        for item in items {
+            let name = uriEncode(item.name, encodeSlash: true)
+            let value = uriEncode(item.value ?? "", encodeSlash: true)
+            pairs.append((name, value))
         }
-        .sorted { $0.0 == $1.0 ? $0.1 < $1.1 : $0.0 < $1.0 }
-        .map { "\($0.0)=\($0.1)" }
-        .joined(separator: "&")
+        pairs.sort { left, right in
+            if left.name == right.name {
+                return left.value < right.value
+            }
+            return left.name < right.name
+        }
+        return pairs.map { "\($0.name)=\($0.value)" }.joined(separator: "&")
     }
 
     static func uriEncode(_ value: String, encodeSlash: Bool) -> String {
