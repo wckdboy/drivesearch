@@ -1,0 +1,12 @@
+.DS_Store
+.build/
+.swiftpm/
+DerivedData/
+build/
+xcuserdata/
+*.xcuserstate
+Config/Secrets.xcconfig
+ThirdParty/
+DriveSearch.xcodeproj/
+*.xcframework
+Packages/ProviderKit/.build/

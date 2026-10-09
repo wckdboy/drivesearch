@@ -1,0 +1,61 @@
+name: DriveSearch
+options:
+  bundleIdPrefix: dev.wckdboy
+  deploymentTarget:
+    iOS: "17.0"
+  createIntermediateGroups: true
+  groupSortPosition: top
+  developmentLanguage: en
+configs:
+  Debug: debug
+  Release: release
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    IPHONEOS_DEPLOYMENT_TARGET: "17.0"
+    TARGETED_DEVICE_FAMILY: "1,2"
+configFiles:
+  Debug: Config/Debug.xcconfig
+  Release: Config/Release.xcconfig
+packages:
+  ProviderKit:
+    path: Packages/ProviderKit
+  FSearchKit:
+    path: ThirdParty/fsearch/apple/FSearchKit
+targets:
+  DriveSearch:
+    type: application
+    platform: iOS
+    sources:
+      - path: DriveSearch
+        excludes:
+          - Info.plist
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.wckdboy.drivesearch
+        PRODUCT_NAME: DriveSearch
+        GENERATE_INFOPLIST_FILE: NO
+        INFOPLIST_FILE: DriveSearch/Info.plist
+        TARGETED_DEVICE_FAMILY: "1,2"
+        SUPPORTS_MACCATALYST: NO
+        ENABLE_TESTABILITY: YES
+        CODE_SIGNING_ALLOWED: NO
+        CODE_SIGNING_REQUIRED: NO
+        CODE_SIGN_IDENTITY: ""
+        CODE_SIGN_STYLE: Manual
+        DEVELOPMENT_TEAM: ""
+    dependencies:
+      - package: ProviderKit
+        product: ProviderKit
+      - package: FSearchKit
+        product: FSearchKit
+    configFiles:
+      Debug: Config/Debug.xcconfig
+      Release: Config/Release.xcconfig
+schemes:
+  DriveSearch:
+    build:
+      targets:
+        DriveSearch: all
+    run:
+      config: Debug
